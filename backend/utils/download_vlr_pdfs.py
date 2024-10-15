@@ -1,6 +1,6 @@
 # File: backend/utils/download_vlr_pdfs.py
 # Optimized script to download all PDF files from any URL found on the page, with custom User-Agent
-# Handles pagination, saves PDFs into hash-based subdirectories, logs progress, and skips previously visited URLs
+# Handles pagination, saves PDFs into hash-based subdirectories, logs progress, skips previously visited URLs, and stores the timestamp of the visited URL
 # Also handles SSL issues related to legacy renegotiation by using an SSLAdapter
 
 import requests
@@ -13,6 +13,7 @@ import hashlib
 import gc
 import re
 import ssl
+from datetime import datetime
 from requests.adapters import HTTPAdapter
 from urllib3.poolmanager import PoolManager
 
@@ -26,7 +27,7 @@ HEADERS = {
 
 # CSV file to keep a mapping of URLs to downloaded PDF files
 CSV_FILE_PATH = 'precompute-data/download_vlr_pdfs/downloaded_pdfs.csv'
-# CSV file to store the list of visited URLs
+# CSV file to store the list of visited URLs with timestamps
 VISITED_URLS_CSV_FILE = 'precompute-data/download_vlr_pdfs/visited_urls.csv'
 
 # Custom SSLAdapter to handle legacy SSL renegotiation
@@ -54,11 +55,12 @@ def load_visited_urls():
         return set(row[0] for row in csvreader if row)
 
 def add_to_visited_urls(url):
-    """Add a URL to the visited URLs CSV."""
+    """Add a URL and timestamp to the visited URLs CSV."""
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # Get the current date and time
     with open(VISITED_URLS_CSV_FILE, 'a', newline='') as csvfile:
         csvwriter = csv.writer(csvfile)
-        csvwriter.writerow([url])
-    logging.debug(f"Added to visited URLs: {url}")
+        csvwriter.writerow([url, timestamp])  # Add the URL and the timestamp
+    logging.debug(f"Added to visited URLs: {url} at {timestamp}")
 
 def add_to_csv(pdf_url, file_path):
     """Add a mapping of the PDF URL to its local file name in the CSV file."""
@@ -108,7 +110,7 @@ def download_pdfs_from_url(url, visited_urls=None, session=None):
         logging.error(f"Error accessing {url}: {e}")
         return
 
-    # Add this URL to the visited URLs CSV
+    # Add this URL to the visited URLs CSV with timestamp
     add_to_visited_urls(url)
 
     # Find and download PDF links from the current page using a regex pattern for .pdf
@@ -182,7 +184,7 @@ if __name__ == "__main__":
     
     # Initialize the CSV files
     initialize_csv(CSV_FILE_PATH, ['PDF_URL', 'Local_File_Name'])
-    initialize_csv(VISITED_URLS_CSV_FILE, ['Visited_URL'])
+    initialize_csv(VISITED_URLS_CSV_FILE, ['Visited_URL', 'Timestamp'])
 
     # Load visited URLs from the CSV
     visited_urls = load_visited_urls()
