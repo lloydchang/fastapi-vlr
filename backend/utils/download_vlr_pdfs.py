@@ -1,6 +1,6 @@
 # File: backend/utils/download_vlr_pdfs.py
 # Optimized script to download all PDF files from any URL found on the page, with custom User-Agent
-# Handles pagination, saves PDFs into hash-based subdirectories, and logs progress
+# Handles pagination, saves PDFs into hash-based subdirectories, logs progress, and skips previously visited URLs
 # Also handles SSL issues related to legacy renegotiation by using an SSLAdapter
 
 import requests
@@ -26,6 +26,8 @@ HEADERS = {
 
 # CSV file to keep a mapping of URLs to downloaded PDF files
 CSV_FILE_PATH = 'precompute-data/download_vlr_pdfs/downloaded_pdfs.csv'
+# CSV file to store the list of visited URLs
+VISITED_URLS_CSV_FILE = 'precompute-data/download_vlr_pdfs/visited_urls.csv'
 
 # Custom SSLAdapter to handle legacy SSL renegotiation
 class SSLAdapter(HTTPAdapter):
@@ -35,13 +37,28 @@ class SSLAdapter(HTTPAdapter):
         kwargs['ssl_context'] = context
         return super().init_poolmanager(*args, **kwargs)
 
-def initialize_csv():
+def initialize_csv(file_path, headers):
     """Initialize the CSV file if it doesn't exist."""
-    if not os.path.exists(CSV_FILE_PATH):
-        logging.info(f"Creating CSV file for tracking downloads: {CSV_FILE_PATH}")
-        with open(CSV_FILE_PATH, 'w', newline='') as csvfile:
+    if not os.path.exists(file_path):
+        logging.info(f"Creating CSV file: {file_path}")
+        with open(file_path, 'w', newline='') as csvfile:
             csvwriter = csv.writer(csvfile)
-            csvwriter.writerow(['PDF_URL', 'Local_File_Name'])
+            csvwriter.writerow(headers)
+
+def load_visited_urls():
+    """Load visited URLs from the CSV file."""
+    if not os.path.exists(VISITED_URLS_CSV_FILE):
+        return set()
+    with open(VISITED_URLS_CSV_FILE, 'r') as csvfile:
+        csvreader = csv.reader(csvfile)
+        return set(row[0] for row in csvreader if row)
+
+def add_to_visited_urls(url):
+    """Add a URL to the visited URLs CSV."""
+    with open(VISITED_URLS_CSV_FILE, 'a', newline='') as csvfile:
+        csvwriter = csv.writer(csvfile)
+        csvwriter.writerow([url])
+    logging.debug(f"Added to visited URLs: {url}")
 
 def add_to_csv(pdf_url, file_path):
     """Add a mapping of the PDF URL to its local file name in the CSV file."""
@@ -90,6 +107,9 @@ def download_pdfs_from_url(url, visited_urls=None, session=None):
     except requests.exceptions.RequestException as e:
         logging.error(f"Error accessing {url}: {e}")
         return
+
+    # Add this URL to the visited URLs CSV
+    add_to_visited_urls(url)
 
     # Find and download PDF links from the current page using a regex pattern for .pdf
     for link in soup.find_all('a', href=True):
@@ -160,8 +180,12 @@ if __name__ == "__main__":
 
     logging.info(f"Starting PDF download for {len(urls_to_scrape)} websites.")
     
-    # Initialize the CSV file
-    initialize_csv()
+    # Initialize the CSV files
+    initialize_csv(CSV_FILE_PATH, ['PDF_URL', 'Local_File_Name'])
+    initialize_csv(VISITED_URLS_CSV_FILE, ['Visited_URL'])
+
+    # Load visited URLs from the CSV
+    visited_urls = load_visited_urls()
 
     # Create a session with the custom SSL adapter
     session = create_session_with_ssl_adapter()
@@ -169,6 +193,6 @@ if __name__ == "__main__":
     # Process each URL in the list
     for url in urls_to_scrape:
         logging.info(f"Processing URL: {url}")
-        download_pdfs_from_url(url, session=session)
+        download_pdfs_from_url(url, visited_urls=visited_urls, session=session)
     
     logging.info("Finished scraping and downloading PDFs.")
