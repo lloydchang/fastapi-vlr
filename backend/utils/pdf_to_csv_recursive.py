@@ -86,7 +86,7 @@ def pdfs_to_csv(pdf_directory: str, csv_output_path: str) -> None:
         logger.warning("No data to save to CSV. The PDF files might be empty or invalid.")
 
 if __name__ == "__main__":
-    pdf_directory = 'precompute-data'  # Replace with the path to your PDF directory
+    pdf_directory = 'precompute-data/download_vlr_pdfs'  # Replace with the path to your PDF directory
     csv_output_path = 'precompute-data/pdfs.csv'  # Replace with the path for the output CSV
     logger.info("Starting PDF to CSV conversion...")
     pdfs_to_csv(pdf_directory, csv_output_path)

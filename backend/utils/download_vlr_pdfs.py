@@ -78,8 +78,10 @@ def download_pdfs_from_url(url, visited_urls=None, session=None):
     if session is None:
         session = create_session_with_ssl_adapter()
 
+    # Log the URL being visited
+    logging.info(f"Visiting URL: {url}")
+
     # Get the webpage content with the specified User-Agent, with streaming to reduce memory usage
-    logging.info(f"Fetching content from URL: {url}")
     logging.debug(f"Equivalent curl command: curl -A \"{HEADERS['User-Agent']}\" {url}")
     try:
         with session.get(url, headers=HEADERS, stream=True) as response:
