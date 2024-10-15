@@ -1,4 +1,4 @@
-# File: backend/utils/pdf_to_csv.py
+# File: backend/utils/pdf_to_csv_recursive.py
 
 import os
 import pandas as pd
@@ -25,43 +25,58 @@ def extract_text_from_pdf(pdf_path: str) -> str:
             all_text = ''
             for page_num, page in enumerate(pdf.pages, start=1):
                 page_text = page.extract_text()
-                logger.debug(f"Extracted text from page {page_num} of {pdf_path}: {page_text[:100]}...")  # Log first 100 characters
-                all_text += page_text + '\n' if page_text else ''
+                if page_text:
+                    logger.debug(f"Extracted text from page {page_num} of {pdf_path}: {page_text[:100]}...")
+                    all_text += page_text + '\n'
+                else:
+                    logger.warning(f"No text found on page {page_num} of {pdf_path}")
             if all_text.strip():
                 logger.info(f"Successfully extracted text from {pdf_path}")
             else:
-                logger.warning(f"No text extracted from {pdf_path}. It might be an image-based PDF.")
+                logger.warning(f"No extractable text found in {pdf_path}. It might be an image-based PDF.")
             return all_text
     except Exception as e:
         logger.error(f"Error extracting text from {pdf_path}: {e}")
         return ''
 
+def find_pdfs_recursively(directory: str):
+    """
+    Recursively finds all PDF files in a directory and its subdirectories.
+
+    Args:
+        directory (str): The directory to search for PDF files.
+
+    Returns:
+        list: A list of full file paths to PDF files.
+    """
+    pdf_files = []
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            if file.lower().endswith(".pdf"):
+                pdf_files.append(os.path.join(root, file))
+    return pdf_files
+
 def pdfs_to_csv(pdf_directory: str, csv_output_path: str) -> None:
     """
-    Converts all PDF files in a directory to a CSV file with extracted text.
+    Converts all PDF files in a directory and subdirectories to a CSV file with extracted text.
 
     Args:
         pdf_directory (str): Directory containing PDF files.
         csv_output_path (str): Path to save the resulting CSV file.
     """
-    data = []
+    pdf_files = find_pdfs_recursively(pdf_directory)
 
-    if not os.path.exists(pdf_directory):
-        logger.error(f"PDF directory {pdf_directory} does not exist.")
-        return
-
-    pdf_files = [f for f in os.listdir(pdf_directory) if f.endswith(".pdf")]
     if not pdf_files:
         logger.warning(f"No PDF files found in {pdf_directory}.")
         return
-    
-    logger.info(f"Found {len(pdf_files)} PDF files in {pdf_directory}. Starting extraction process...")
 
-    for filename in pdf_files:
-        pdf_path = os.path.join(pdf_directory, filename)
-        logger.info(f"Processing {pdf_path}...")
-        text = extract_text_from_pdf(pdf_path)
-        data.append({'filename': filename, 'content': text})
+    logger.info(f"Found {len(pdf_files)} PDF files. Starting extraction...")
+
+    data = []
+    for pdf_file in pdf_files:
+        logger.info(f"Processing {pdf_file}...")
+        text = extract_text_from_pdf(pdf_file)
+        data.append({'filename': os.path.basename(pdf_file), 'content': text})
 
     if data:
         df = pd.DataFrame(data)
