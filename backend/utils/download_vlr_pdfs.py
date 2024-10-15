@@ -25,7 +25,7 @@ HEADERS = {
 }
 
 # CSV file to keep a mapping of URLs to downloaded PDF files
-CSV_FILE_PATH = 'precompute-data/downloaded_pdfs.csv'
+CSV_FILE_PATH = 'precompute-data/download_vlr_pdfs/downloaded_pdfs.csv'
 
 # Custom SSLAdapter to handle legacy SSL renegotiation
 class SSLAdapter(HTTPAdapter):
@@ -54,7 +54,7 @@ def generate_hash_subdirectory(pdf_url):
     """Generate a hash-based subdirectory using a hash of the PDF URL."""
     hash_object = hashlib.md5(pdf_url.encode())  # Generate a hash of the URL
     hash_suffix = hash_object.hexdigest()[:8]  # Use the first 8 characters of the hash
-    subdirectory = f"precompute-data/{hash_suffix}"  # Use the hash as the subdirectory name
+    subdirectory = f"precompute-data/download_vlr_pdfs/{hash_suffix}"  # Use the hash as the subdirectory name
     return subdirectory
 
 def create_session_with_ssl_adapter():
