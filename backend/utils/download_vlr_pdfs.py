@@ -1,6 +1,6 @@
 # File: backend/utils/download_vlr_pdfs.py
 # Optimized script to download all PDF files from specific subdirectories of URLs, with custom User-Agent
-# Downloads PDFs into a subdirectory called 'precompute-data' and skips already downloaded PDFs
+# Handles pagination to find additional PDFs, downloads PDFs into 'precompute-data', and skips already downloaded PDFs
 # Keeps a CSV file that maps PDF URLs to local file names and uses memory-efficient streaming and logging
 
 import requests
@@ -89,6 +89,14 @@ def download_pdfs_from_url(url, save_directory="precompute-data", visited_urls=N
             download_pdf(full_url, save_directory)
         else:
             logging.debug(f"Ignored hyperlink: {full_url} (not in specific subdirectory)")
+
+    # Look for pagination links and navigate them
+    pagination_links = soup.select('a[href*="page="]')
+    for page_link in pagination_links:
+        page_url = urljoin(url, page_link['href'])
+        if page_url not in visited_urls:
+            logging.debug(f"Found pagination link: {page_url}")
+            download_pdfs_from_url(page_url, save_directory, visited_urls)
 
     # Perform garbage collection after each batch
     gc.collect()
