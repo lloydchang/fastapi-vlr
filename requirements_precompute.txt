@@ -1,0 +1,9 @@
+# File: requirements_precompute.txt
+
+beautifulsoup4
+numpy
+pandas
+pdfplumber
+Requests
+scikit_learn
+scipy
