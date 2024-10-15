@@ -1,15 +1,16 @@
 # File: backend/utils/download_vlr_pdfs.py
-# Optimized script to download all PDF files from specific subdirectories of URLs, with custom User-Agent
+# Optimized script to download all PDF files from any URL found on the page, with custom User-Agent
 # Handles pagination, saves PDFs into hash-based subdirectories, and logs progress
 
 import requests
 from bs4 import BeautifulSoup
 import os
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin
 import logging
 import csv
 import hashlib
 import gc
+import re
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -54,21 +55,6 @@ def download_pdfs_from_url(url, visited_urls=None):
         return
     visited_urls.add(url)
 
-    # Define the specific directories for each site
-    site_specific_directories = {
-        "https://sdgs.un.org": "https://sdgs.un.org/sites/default/files/vlrs/",
-        "https://unhabitat.org": "https://unhabitat.org/sites/default/files/",
-        "https://www.local2030.org": "https://www.local2030.org/pdf/vlr",
-        "https://www.iges.or.jp": "https://www.iges.or.jp/sites/default/files/"
-    }
-
-    # Get the base domain to apply the correct PDF directory
-    base_domain = "{0.scheme}://{0.netloc}".format(urlparse(url))
-    specific_directory = site_specific_directories.get(base_domain, None)
-    if not specific_directory:
-        logging.error(f"No matching directory found for base domain: {base_domain}")
-        return
-
     # Get the webpage content with the specified User-Agent, with streaming to reduce memory usage
     logging.info(f"Fetching content from URL: {url}")
     logging.debug(f"Equivalent curl command: curl -A \"{HEADERS['User-Agent']}\" {url}")
@@ -80,17 +66,17 @@ def download_pdfs_from_url(url, visited_urls=None):
         logging.error(f"Error accessing {url}: {e}")
         return
 
-    # Find and download PDF links from the current page
+    # Find and download PDF links from the current page using a regex pattern for .pdf
     for link in soup.find_all('a', href=True):
         href = link['href']
         full_url = urljoin(url, href)
 
-        # Check if the link is a PDF file in the correct subdirectory
-        if full_url.startswith(specific_directory) and full_url.endswith('.pdf'):
+        # Check if the URL ends with .pdf using regex
+        if re.search(r"\.pdf$", full_url, re.IGNORECASE):
             logging.debug(f"Found PDF link: {full_url}")
             download_pdf(full_url)
         else:
-            logging.debug(f"Ignored hyperlink: {full_url} (not in specific subdirectory)")
+            logging.debug(f"Ignored hyperlink: {full_url} (not a PDF)")
 
     # Look for pagination links and navigate them
     pagination_links = soup.select('a[href*="page="]')
@@ -135,8 +121,8 @@ def download_pdf(pdf_url):
     except Exception as e:
         logging.error(f"Failed to download {pdf_url}. Error: {e}")
     
-    # Perform garbage collection after each download
-    gc.collect()
+    # Uncomment to perform garbage collection after each download
+    # gc.collect()
 
 if __name__ == "__main__":
     # List of URLs to scrape
