@@ -1,7 +1,7 @@
 # File: backend/utils/download_vlr_pdfs.py
-# Script to download all PDF files from specific subdirectories of URLs, recursively traversing links with a custom User-Agent
+# Optimized script to download all PDF files from specific subdirectories of URLs, with custom User-Agent
 # Downloads PDFs into a subdirectory called 'precompute-data' and skips already downloaded PDFs
-# Keeps a CSV file that maps PDF URLs to local file names and provides detailed debug logging
+# Keeps a CSV file that maps PDF URLs to local file names and uses memory-efficient streaming and logging
 
 import requests
 from bs4 import BeautifulSoup
@@ -9,6 +9,7 @@ import os
 from urllib.parse import urljoin, urlparse
 import logging
 import csv
+import gc
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -66,18 +67,16 @@ def download_pdfs_from_url(url, save_directory="precompute-data", visited_urls=N
         logging.error(f"No matching directory found for base domain: {base_domain}")
         return
 
-    # Get the webpage content with the specified User-Agent
+    # Get the webpage content with the specified User-Agent, with streaming to reduce memory usage
     logging.info(f"Fetching content from URL: {url}")
     logging.debug(f"Equivalent curl command: curl -A \"{HEADERS['User-Agent']}\" {url}")
     try:
-        response = requests.get(url, headers=HEADERS)
-        response.raise_for_status()  # Check for HTTP errors
+        with requests.get(url, headers=HEADERS, stream=True) as response:
+            response.raise_for_status()  # Check for HTTP errors
+            soup = BeautifulSoup(response.content, 'html.parser')
     except requests.exceptions.RequestException as e:
         logging.error(f"Error accessing {url}: {e}")
         return
-
-    # Parse the webpage content
-    soup = BeautifulSoup(response.content, 'html.parser')
 
     # Find and download PDF links from the current page
     for link in soup.find_all('a', href=True):
@@ -91,6 +90,9 @@ def download_pdfs_from_url(url, save_directory="precompute-data", visited_urls=N
         else:
             logging.debug(f"Ignored hyperlink: {full_url} (not in specific subdirectory)")
 
+    # Perform garbage collection after each batch
+    gc.collect()
+
 def download_pdf(pdf_url, save_directory):
     file_name = os.path.join(save_directory, pdf_url.split("/")[-1])
     
@@ -102,18 +104,21 @@ def download_pdf(pdf_url, save_directory):
     logging.info(f"Downloading PDF: {pdf_url} into {file_name}")
     logging.debug(f"Equivalent curl command: curl -A \"{HEADERS['User-Agent']}\" -o {file_name} {pdf_url}")
 
-    # Download the PDF file with the specified User-Agent
+    # Stream the PDF download to avoid memory overload
     try:
         with requests.get(pdf_url, headers=HEADERS, stream=True) as pdf_response:
             pdf_response.raise_for_status()
             with open(file_name, 'wb') as pdf_file:
-                for chunk in pdf_response.iter_content(chunk_size=8192):
+                for chunk in pdf_response.iter_content(chunk_size=1024):
                     if chunk:  # Filter out keep-alive chunks
                         pdf_file.write(chunk)
         logging.info(f"Successfully downloaded: {file_name}")
         add_to_csv(pdf_url, file_name)  # Add the download to the CSV tracking file
     except Exception as e:
         logging.error(f"Failed to download {pdf_url}. Error: {e}")
+    
+    # Perform garbage collection after each download
+    gc.collect()
 
 if __name__ == "__main__":
     # List of URLs to scrape
