@@ -153,4 +153,20 @@ if __name__ == "__main__":
         "https://sdgs.un.org/topics/voluntary-local-reviews",
         "https://unhabitat.org/topics/voluntary-local-reviews?order=field_year_of_publication_vlr&sort=desc#block-vlrworldmap",
         "https://www.local2030.org/vlrs",
-        "https://www.iges.or.jp/en
+        "https://www.iges.or.jp/en/projects/vlr"
+    ]
+
+    logging.info(f"Starting PDF download for {len(urls_to_scrape)} websites.")
+    
+    # Initialize the CSV file
+    initialize_csv()
+
+    # Create a session with the custom SSL adapter
+    session = create_session_with_ssl_adapter()
+
+    # Process each URL in the list
+    for url in urls_to_scrape:
+        logging.info(f"Processing URL: {url}")
+        download_pdfs_from_url(url, session=session)
+    
+    logging.info("Finished scraping and downloading PDFs.")
