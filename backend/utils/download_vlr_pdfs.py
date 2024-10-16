@@ -47,10 +47,17 @@ def initialize_csv(file_path, headers):
 
 def load_csv_to_set(file_path, column_index=2):
     """Load a specific column from a CSV file into a set."""
-    if not os.path.exists(file_path):
+    if not os.path.exists(file_path) or os.stat(file_path).st_size == 0:
+        logging.warning(f"{file_path} is missing or empty.")
         return set()
+    
     with open(file_path, 'r') as csvfile:
-        return {row[column_index] for row in csv.reader(csvfile) if row}
+        reader = csv.reader(csvfile)
+        try:
+            return {row[column_index] for row in reader if len(row) > column_index}
+        except IndexError as e:
+            logging.error(f"Error reading {file_path}: {e}")
+            return set()
 
 def add_to_csv(file_path, row):
     """Add a new row to a CSV file."""
