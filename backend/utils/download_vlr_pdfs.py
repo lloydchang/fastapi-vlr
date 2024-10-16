@@ -6,7 +6,7 @@
 import requests
 from bs4 import BeautifulSoup
 import os
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 import logging
 import csv
 import hashlib
@@ -23,7 +23,6 @@ from webdriver_manager.chrome import ChromeDriverManager
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Headers for requests to simulate a browser user-agent
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36'
 }
@@ -32,7 +31,6 @@ CSV_FILE_PATH = 'precompute-data/download_vlr_pdfs/downloaded_pdfs.csv'
 VISITED_URLS_CSV_FILE = 'precompute-data/download_vlr_pdfs/visited_urls.csv'
 
 class SSLAdapter(HTTPAdapter):
-    """Custom SSLAdapter to handle legacy SSL renegotiation."""
     def init_poolmanager(self, *args, **kwargs):
         context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
         context.options |= ssl.OP_LEGACY_SERVER_CONNECT
@@ -74,7 +72,6 @@ def create_session_with_ssl_adapter():
     return session
 
 def use_selenium(url):
-    """Use Selenium to fetch the webpage if regular requests fail."""
     logging.info(f"Attempting with Selenium for URL: {url}")
     try:
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
@@ -119,11 +116,11 @@ def download_pdfs_from_url(url, visited_urls=None, session=None):
 
     for link in soup.find_all('a', href=True):
         href = link['href']
-        full_url = urljoin(url, href)
+        full_url = urljoin(url, href)  # Properly join relative URLs
 
         if re.search(r"\.pdf$", full_url, re.IGNORECASE):
             download_pdf(full_url, session)
-        elif full_url.startswith(url) and full_url not in visited_urls:
+        elif is_internal_link(full_url, url) and full_url not in visited_urls:
             logging.debug(f"Following internal link: {full_url}")
             download_pdfs_from_url(full_url, visited_urls, session)
 
@@ -135,6 +132,12 @@ def download_pdfs_from_url(url, visited_urls=None, session=None):
             download_pdfs_from_url(page_url, visited_urls, session)
 
     gc.collect()
+
+def is_internal_link(link, base_url):
+    """Check if a link belongs to the same domain as the base URL."""
+    base_netloc = urlparse(base_url).netloc
+    link_netloc = urlparse(link).netloc
+    return base_netloc == link_netloc or not link_netloc
 
 def download_pdf(pdf_url, session):
     original_filename = pdf_url.split("/")[-1]
