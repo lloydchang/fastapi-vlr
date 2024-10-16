@@ -120,9 +120,9 @@ def download_pdfs_from_url(url, visited_urls=None, session=None):
 
         if re.search(r"\.pdf$", full_url, re.IGNORECASE):
             download_pdf(full_url, session)
-        elif is_internal_link(full_url, url) and full_url not in visited_urls:
-            logging.debug(f"Following internal link: {full_url}")
-            download_pdfs_from_url(full_url, visited_urls, session)
+        # elif is_internal_link(full_url, url) and full_url not in visited_urls:
+        #     logging.debug(f"Following internal link: {full_url}")
+        #     download_pdfs_from_url(full_url, visited_urls, session)
 
     pagination_links = soup.select('a[href*="page="]')
     for page_link in pagination_links:
@@ -165,7 +165,6 @@ if __name__ == "__main__":
         "https://sdgs.un.org/topics/voluntary-local-reviews",
         "https://unhabitat.org/topics/voluntary-local-reviews?order=field_year_of_publication_vlr&sort=desc#block-vlrworldmap",
         "https://www.local2030.org/vlrs",
-        "https://www.iges.or.jp/en/projects/vlr",
         "https://www.iges.or.jp/en/vlr/agadir",
         "https://www.iges.or.jp/en/vlr/agios-dimitrios",
         "https://www.iges.or.jp/en/vlr/alor-gajah",
