@@ -2,6 +2,8 @@
 
 beautifulsoup4
 cloudscraper
+selenium
+webdriver-manager
 numpy
 pandas
 pdfplumber

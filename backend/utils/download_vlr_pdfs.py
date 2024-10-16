@@ -17,6 +17,9 @@ import cloudscraper  # Import cloudscraper
 from datetime import datetime
 from requests.adapters import HTTPAdapter
 from urllib3.poolmanager import PoolManager
+from selenium import webdriver  # Import selenium
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -97,6 +100,22 @@ def use_cloudscraper_if_needed(url):
         logging.error(f"Cloudscraper also failed for {url}: {e}")
         return None
 
+def use_selenium_if_needed(url):
+    """Fallback to Selenium if cloudscraper fails to bypass protections."""
+    logging.info(f"Attempting with Selenium for URL: {url}")
+    # Start a browser session with Selenium
+    try:
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
+        driver.get(url)
+        driver.implicitly_wait(10)  # Wait for page load
+        page_source = driver.page_source
+        driver.quit()
+        logging.info(f"Successfully accessed {url} using Selenium.")
+        return BeautifulSoup(page_source, 'html.parser')
+    except Exception as e:
+        logging.error(f"Selenium failed for {url}: {e}")
+        return None
+
 def download_pdfs_from_url(url, visited_urls=None, session=None):
     if visited_urls is None:
         visited_urls = set()
@@ -122,6 +141,9 @@ def download_pdfs_from_url(url, visited_urls=None, session=None):
                 # Handle 403 Forbidden by switching to cloudscraper
                 logging.warning(f"HTTP 403 Forbidden encountered for {url}. Switching to cloudscraper.")
                 soup = use_cloudscraper_if_needed(url)
+                if soup is None:
+                    logging.warning(f"Cloudscraper failed for {url}. Switching to Selenium.")
+                    soup = use_selenium_if_needed(url)
             else:
                 response.raise_for_status()  # Check for HTTP errors
                 soup = BeautifulSoup(response.content, 'html.parser')
