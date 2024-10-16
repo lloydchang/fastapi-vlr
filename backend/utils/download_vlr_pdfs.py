@@ -41,7 +41,7 @@ CSV_FILE_PATH = os.path.join(BASE_DOWNLOAD_DIR, 'downloaded_pdfs.csv')
 VISITED_URLS_CSV_FILE = os.path.join(BASE_DOWNLOAD_DIR, 'visited_urls.csv')
 UNIQUE_PDFS_CSV_FILE = os.path.join(BASE_DOWNLOAD_DIR, 'unique_pdfs.csv')
 DUPLICATE_PDFS_CSV_FILE = os.path.join(BASE_DOWNLOAD_DIR, 'duplicate_pdfs.csv')
-URLS_FILE_PATH = 'urls.txt'  # External file containing all URLs, one per line
+URLS_FILE_PATH = os.path.join(BASE_DOWNLOAD_DIR, 'urls.txt')  # External file containing all URLs, one per line
 
 # Ensure base download directory exists
 os.makedirs(BASE_DOWNLOAD_DIR, exist_ok=True)
@@ -103,10 +103,12 @@ class SSLAdapterWithRetries(HTTPAdapter):
 def create_session_with_ssl_adapter():
     """Create an HTTP session with SSL support and retry strategy."""
     session = requests.Session()
-    retries = Retry(total=5,
-                    backoff_factor=1,
-                    status_forcelist=[429, 500, 502, 503, 504],
-                    method_whitelist=["HEAD", "GET", "OPTIONS"])
+    retries = Retry(
+        total=5,
+        backoff_factor=1,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["HEAD", "GET", "OPTIONS"]  # Updated from method_whitelist
+    )
     adapter = SSLAdapterWithRetries(max_retries=retries)
     session.mount('https://', adapter)
     session.headers.update(HEADERS)

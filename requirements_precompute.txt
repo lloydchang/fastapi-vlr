@@ -4,6 +4,8 @@ beautifulsoup4
 cloudscraper
 selenium
 webdriver-manager
+tqdm
+tenacity
 numpy
 pandas
 pdfplumber
