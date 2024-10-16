@@ -1,7 +1,7 @@
 # File: backend/utils/download_vlr_pdfs.py
 # Optimized script to download all PDF files from any URL found on the page, with custom User-Agent
 # Handles pagination, saves PDFs into hash-based subdirectories, logs progress, skips previously visited URLs,
-# and stores the timestamp of the visited URL. Also handles SSL issues related to legacy renegotiation using an SSLAdapter.
+# and stores the timestamp of the visited URL. Also handles SSL issues using an SSLAdapter.
 
 import requests
 from bs4 import BeautifulSoup
@@ -13,7 +13,6 @@ import hashlib
 import gc
 import re
 import ssl
-import cloudscraper  # Import cloudscraper
 from datetime import datetime
 from requests.adapters import HTTPAdapter
 from urllib3.poolmanager import PoolManager
@@ -24,7 +23,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Define the headers to include the custom User-Agent
+# Headers for requests to simulate a browser user-agent
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36'
 }
@@ -74,18 +73,8 @@ def create_session_with_ssl_adapter():
     session.mount('https://', SSLAdapter())
     return session
 
-def use_cloudscraper_if_needed(url):
-    logging.info(f"Attempting with cloudscraper for URL: {url}")
-    scraper = cloudscraper.create_scraper()
-    try:
-        response = scraper.get(url)
-        response.raise_for_status()
-        return BeautifulSoup(response.content, 'html.parser')
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Cloudscraper failed for {url}: {e}")
-        return None
-
-def use_selenium_if_needed(url):
+def use_selenium(url):
+    """Use Selenium to fetch the webpage if regular requests fail."""
     logging.info(f"Attempting with Selenium for URL: {url}")
     try:
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
@@ -114,7 +103,8 @@ def download_pdfs_from_url(url, visited_urls=None, session=None):
     try:
         with session.get(url, headers=HEADERS, stream=True) as response:
             if response.status_code == 403:
-                soup = use_cloudscraper_if_needed(url) or use_selenium_if_needed(url)
+                logging.warning(f"403 Forbidden for {url}. Using Selenium.")
+                soup = use_selenium(url)
             else:
                 response.raise_for_status()
                 soup = BeautifulSoup(response.content, 'html.parser')
