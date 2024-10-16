@@ -1,3 +1,5 @@
+# File: fastapi-vlr/backend/utils/download_vlr_pdfs.py
+
 import requests
 from bs4 import BeautifulSoup
 import os
@@ -32,12 +34,13 @@ HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)'
                   ' Chrome/129.0.0.0 Safari/537.36'
 }
-BASE_DOWNLOAD_DIR = 'precompute-data/download_vlr_pdfs'
-CSV_FILE_PATH = os.path.join(BASE_DOWNLOAD_DIR, 'downloaded_pdfs.csv')
-VISITED_URLS_CSV_FILE = os.path.join(BASE_DOWNLOAD_DIR, 'visited_urls.csv')
-UNIQUE_PDFS_CSV_FILE = os.path.join(BASE_DOWNLOAD_DIR, 'unique_pdfs.csv')
-DUPLICATE_PDFS_CSV_FILE = os.path.join(BASE_DOWNLOAD_DIR, 'duplicate_pdfs.csv')
-URLS_FILE_PATH = os.path.join(BASE_DOWNLOAD_DIR, 'urls.txt')  # External file containing all URLs, one per line
+BASE_SCRIPT_DIR = 'precompute-data/download_vlr_pdfs'
+BASE_DOWNLOAD_DIR = 'precompute-data/download_vlr_pdfs/downloads'
+CSV_FILE_PATH = os.path.join(BASE_SCRIPT_DIR, 'downloaded_pdfs.csv')
+VISITED_URLS_CSV_FILE = os.path.join(BASE_SCRIPT_DIR, 'visited_urls.csv')
+UNIQUE_PDFS_CSV_FILE = os.path.join(BASE_SCRIPT_DIR, 'unique_pdfs.csv')
+DUPLICATE_PDFS_CSV_FILE = os.path.join(BASE_SCRIPT_DIR, 'duplicate_pdfs.csv')
+URLS_FILE_PATH = os.path.join(BASE_SCRIPT_DIR, 'urls.txt')  # External file containing all URLs, one per line
 
 # Ensure base download directory exists
 os.makedirs(BASE_DOWNLOAD_DIR, exist_ok=True)
