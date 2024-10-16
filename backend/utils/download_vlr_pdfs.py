@@ -1,5 +1,3 @@
-# File: download_vlr_pdfs.py
-
 import requests
 from bs4 import BeautifulSoup
 import os
@@ -16,8 +14,6 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
 import re
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from functools import partial
 from tqdm import tqdm
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
@@ -90,15 +86,15 @@ def generate_hash_from_response(response):
 
 class SSLAdapterWithRetries(HTTPAdapter):
     """An HTTPS adapter that uses a custom SSL context and retry strategy."""
-    def __init__(self, *args, **kwargs):
-        self.max_retries = kwargs.pop("max_retries", 3)
-        super().__init__(*args, **kwargs)
-    
+    def __init__(self, max_retries=3, *args, **kwargs):
+        self.max_retries = max_retries
+        super().__init__(max_retries=self.max_retries, *args, **kwargs)
+
     def init_poolmanager(self, *args, **kwargs):
         context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
-        context.options |= ssl.OP_LEGACY_SERVER_CONNECT
+        context.options |= ssl.OP_LEGACY_SERVER_CONNECT  # Retain this if needed
         kwargs['ssl_context'] = context
-        self.poolmanager = super().init_poolmanager(*args, **kwargs)
+        super().init_poolmanager(*args, **kwargs)
 
 def create_session_with_ssl_adapter():
     """Create an HTTP session with SSL support and retry strategy."""
@@ -267,17 +263,9 @@ def main():
         logging.error("No URLs to scrape. Exiting.")
         return
 
-    # Use ThreadPoolExecutor for concurrent downloads
-    max_workers = min(20, os.cpu_count() * 5)  # Adjust based on your system
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = []
-        for url in urls_to_scrape:
-            future = executor.submit(download_pdfs_from_url, url, visited_urls, unique_hashes, session)
-            futures.append(future)
-
-        # Use tqdm for progress bar
-        for _ in tqdm(as_completed(futures), total=len(futures), desc="Downloading PDFs"):
-            pass
+    # Use tqdm for progress bar
+    for url in tqdm(urls_to_scrape, desc="Downloading PDFs"):
+        download_pdfs_from_url(url, visited_urls, unique_hashes, session)
 
     logging.info("Finished scraping and downloading PDFs.")
 
