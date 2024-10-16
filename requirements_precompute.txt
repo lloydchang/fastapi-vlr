@@ -1,6 +1,7 @@
 # File: requirements_precompute.txt
 
 beautifulsoup4
+cloudscraper
 numpy
 pandas
 pdfplumber

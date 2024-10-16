@@ -13,6 +13,7 @@ import hashlib
 import gc
 import re
 import ssl
+import cloudscraper  # Import cloudscraper
 from datetime import datetime
 from requests.adapters import HTTPAdapter
 from urllib3.poolmanager import PoolManager
@@ -83,6 +84,19 @@ def create_session_with_ssl_adapter():
     session.mount('https://', adapter)
     return session
 
+def use_cloudscraper_if_needed(url):
+    """Fallback to cloudscraper if normal request gets blocked with HTTP 403."""
+    logging.info(f"Attempting with cloudscraper for URL: {url}")
+    scraper = cloudscraper.create_scraper()
+    try:
+        response = scraper.get(url)
+        response.raise_for_status()  # Check for HTTP errors
+        logging.info(f"Successfully accessed {url} using cloudscraper.")
+        return BeautifulSoup(response.content, 'html.parser')
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Cloudscraper also failed for {url}: {e}")
+        return None
+
 def download_pdfs_from_url(url, visited_urls=None, session=None):
     if visited_urls is None:
         visited_urls = set()
@@ -104,10 +118,19 @@ def download_pdfs_from_url(url, visited_urls=None, session=None):
     logging.debug(f"Equivalent curl command: curl -A \"{HEADERS['User-Agent']}\" {url}")
     try:
         with session.get(url, headers=HEADERS, stream=True) as response:
-            response.raise_for_status()  # Check for HTTP errors
-            soup = BeautifulSoup(response.content, 'html.parser')
+            if response.status_code == 403:
+                # Handle 403 Forbidden by switching to cloudscraper
+                logging.warning(f"HTTP 403 Forbidden encountered for {url}. Switching to cloudscraper.")
+                soup = use_cloudscraper_if_needed(url)
+            else:
+                response.raise_for_status()  # Check for HTTP errors
+                soup = BeautifulSoup(response.content, 'html.parser')
     except requests.exceptions.RequestException as e:
         logging.error(f"Error accessing {url}: {e}")
+        return
+
+    # If soup is None, the page couldn't be accessed, so return
+    if soup is None:
         return
 
     # Add this URL to the visited URLs CSV with timestamp
@@ -167,9 +190,6 @@ def download_pdf(pdf_url, session):
         add_to_csv(pdf_url, file_path)  # Add the download to the CSV tracking file
     except Exception as e:
         logging.error(f"Failed to download {pdf_url}. Error: {e}")
-
-    # Uncomment to perform garbage collection after each download
-    # gc.collect()
 
 if __name__ == "__main__":
     # List of URLs to scrape
