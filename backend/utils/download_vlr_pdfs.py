@@ -1,5 +1,7 @@
-# File: backend/utils/download_vlr_pdfs.py
-# Optimized script to download PDFs, ensuring uniqueness using content hashing.
+# File: download_vlr_pdfs.py
+
+
+# Optimized script to download PDFs in their original format, ensuring uniqueness using content hashing.
 # Duplicates are logged instead of deleted, with tracking in `duplicate_pdfs.csv`.
 
 import requests
@@ -8,8 +10,6 @@ import os
 import logging
 import csv
 import hashlib
-import gc
-import re
 import ssl
 from datetime import datetime
 from urllib.parse import urljoin
@@ -17,21 +17,36 @@ from requests.adapters import HTTPAdapter
 from urllib3.poolmanager import PoolManager
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
+import re
 
 # Configure logging
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("download_vlr_pdfs.log"),
+        logging.StreamHandler()
+    ]
+)
 
 # Constants
 HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36'
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)'
+                  ' Chrome/129.0.0.0 Safari/537.36'
 }
-CSV_FILE_PATH = 'precompute-data/download_vlr_pdfs/downloaded_pdfs.csv'
-VISITED_URLS_CSV_FILE = 'precompute-data/download_vlr_pdfs/visited_urls.csv'
-UNIQUE_PDFS_CSV_FILE = 'precompute-data/download_vlr_pdfs/unique_pdfs.csv'
-DUPLICATE_PDFS_CSV_FILE = 'precompute-data/download_vlr_pdfs/duplicate_pdfs.csv'
+BASE_DOWNLOAD_DIR = 'precompute-data/download_vlr_pdfs'
+CSV_FILE_PATH = os.path.join(BASE_DOWNLOAD_DIR, 'downloaded_pdfs.csv')
+VISITED_URLS_CSV_FILE = os.path.join(BASE_DOWNLOAD_DIR, 'visited_urls.csv')
+UNIQUE_PDFS_CSV_FILE = os.path.join(BASE_DOWNLOAD_DIR, 'unique_pdfs.csv')
+DUPLICATE_PDFS_CSV_FILE = os.path.join(BASE_DOWNLOAD_DIR, 'duplicate_pdfs.csv')
+
+# Ensure base download directory exists
+os.makedirs(BASE_DOWNLOAD_DIR, exist_ok=True)
 
 class SSLAdapter(HTTPAdapter):
+    """An HTTPS adapter that uses an arbitrary SSL version."""
     def init_poolmanager(self, *args, **kwargs):
         context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
         context.options |= ssl.OP_LEGACY_SERVER_CONNECT
@@ -39,78 +54,117 @@ class SSLAdapter(HTTPAdapter):
         return super().init_poolmanager(*args, **kwargs)
 
 def initialize_csv(file_path, headers):
-    """Create a CSV file if it doesn't exist."""
+    """Create a CSV file with headers if it doesn't exist."""
     if not os.path.exists(file_path):
         logging.info(f"Creating CSV file: {file_path}")
-        with open(file_path, 'w', newline='') as csvfile:
-            csv.writer(csvfile).writerow(headers)
+        with open(file_path, 'w', newline='', encoding='utf-8') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(headers)
 
-def load_csv_to_set(file_path, column_index=2):
+def load_csv_to_set(file_path, column_index=0):
     """Load a specific column from a CSV file into a set."""
     if not os.path.exists(file_path) or os.stat(file_path).st_size == 0:
         logging.warning(f"{file_path} is missing or empty.")
         return set()
     
-    with open(file_path, 'r') as csvfile:
+    loaded_set = set()
+    with open(file_path, 'r', encoding='utf-8') as csvfile:
         reader = csv.reader(csvfile)
-        try:
-            return {row[column_index] for row in reader if len(row) > column_index}
-        except IndexError as e:
-            logging.error(f"Error reading {file_path}: {e}")
-            return set()
+        next(reader, None)  # Skip header
+        for row in reader:
+            if len(row) > column_index:
+                loaded_set.add(row[column_index])
+    return loaded_set
 
 def add_to_csv(file_path, row):
     """Add a new row to a CSV file."""
-    with open(file_path, 'a', newline='') as csvfile:
-        csv.writer(csvfile).writerow(row)
+    with open(file_path, 'a', newline='', encoding='utf-8') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(row)
     logging.debug(f"Added row to {file_path}: {row}")
 
 def generate_hash(file_path):
     """Generate an MD5 hash of the file content."""
     hasher = hashlib.md5()
-    with open(file_path, 'rb') as f:
-        for chunk in iter(lambda: f.read(4096), b""):
-            hasher.update(chunk)
+    try:
+        with open(file_path, 'rb') as f:
+            for chunk in iter(lambda: f.read(4096), b""):
+                hasher.update(chunk)
+    except Exception as e:
+        logging.error(f"Error generating hash for {file_path}: {e}")
+        return None
     return hasher.hexdigest()
 
 def download_pdf(pdf_url, session, unique_hashes):
     """Download PDF and track duplicates using content hash."""
-    original_filename = pdf_url.split("/")[-1]
-    subdirectory = generate_hash_subdirectory(pdf_url)
-    file_path = os.path.join(subdirectory, original_filename)
-
-    if os.path.exists(file_path):
-        logging.info(f"PDF already exists: {file_path}")
-        return
-
     try:
-        logging.info(f"Downloading PDF: {pdf_url} into {file_path}")
-        with session.get(pdf_url, headers=HEADERS, stream=True) as response:
-            response.raise_for_status()
-            with open(file_path, 'wb') as pdf_file:
-                for chunk in response.iter_content(1024):
-                    if chunk:
-                        pdf_file.write(chunk)
-            logging.debug(f"Successfully downloaded: {file_path}")
-    except Exception as e:
+        response = session.get(pdf_url, headers=HEADERS, stream=True, timeout=30)
+        response.raise_for_status()
+        
+        # Check if response is a PDF
+        content_type = response.headers.get('Content-Type', '').lower()
+        if 'application/pdf' not in content_type:
+            logging.warning(f"URL does not point to a PDF: {pdf_url}")
+            return
+        
+        original_filename = pdf_url.split("/")[-1]
+        if not original_filename.lower().endswith('.pdf'):
+            original_filename += '.pdf'
+        
+        # Generate a temporary file path
+        temp_dir = os.path.join(BASE_DOWNLOAD_DIR, 'temp')
+        os.makedirs(temp_dir, exist_ok=True)
+        temp_file_path = os.path.join(temp_dir, original_filename)
+        
+        # Download the PDF in chunks
+        with open(temp_file_path, 'wb') as pdf_file:
+            for chunk in response.iter_content(chunk_size=1024):
+                if chunk:
+                    pdf_file.write(chunk)
+        
+        # Generate hash of downloaded PDF
+        pdf_hash = generate_hash(temp_file_path)
+        if not pdf_hash:
+            logging.error(f"Failed to generate hash for {pdf_url}")
+            os.remove(temp_file_path)
+            return
+        
+        if pdf_hash in unique_hashes:
+            logging.info(f"Duplicate PDF detected: {pdf_url}")
+            add_to_csv(DUPLICATE_PDFS_CSV_FILE, [pdf_url, original_filename, pdf_hash])
+            os.remove(temp_file_path)
+        else:
+            # Move the file to its final destination
+            hash_suffix = pdf_hash[:8]
+            subdirectory = os.path.join(BASE_DOWNLOAD_DIR, hash_suffix)
+            os.makedirs(subdirectory, exist_ok=True)
+            final_file_path = os.path.join(subdirectory, original_filename)
+            
+            # Handle filename conflicts
+            if os.path.exists(final_file_path):
+                base, ext = os.path.splitext(original_filename)
+                counter = 1
+                while os.path.exists(final_file_path):
+                    final_file_path = os.path.join(subdirectory, f"{base}_{counter}{ext}")
+                    counter += 1
+            
+            os.rename(temp_file_path, final_file_path)
+            logging.info(f"Successfully downloaded: {final_file_path}")
+            
+            # Update CSV and hash set
+            add_to_csv(UNIQUE_PDFS_CSV_FILE, [pdf_url, final_file_path, pdf_hash])
+            add_to_csv(CSV_FILE_PATH, [pdf_url, final_file_path])
+            unique_hashes.add(pdf_hash)
+    
+    except requests.exceptions.RequestException as e:
         logging.error(f"Failed to download {pdf_url}. Error: {e}")
-        return
-
-    pdf_hash = generate_hash(file_path)
-    if pdf_hash in unique_hashes:
-        logging.info(f"Duplicate PDF detected: {pdf_url}")
-        add_to_csv(DUPLICATE_PDFS_CSV_FILE, [pdf_url, file_path, pdf_hash])
-    else:
-        add_to_csv(UNIQUE_PDFS_CSV_FILE, [pdf_url, file_path, pdf_hash])
-        unique_hashes.add(pdf_hash)
-        logging.info(f"Registered unique PDF: {pdf_url}")
-
-    add_to_csv(CSV_FILE_PATH, [pdf_url, file_path])
+    except Exception as e:
+        logging.error(f"Unexpected error while downloading {pdf_url}: {e}")
 
 def generate_hash_subdirectory(pdf_url):
     """Generate a hash-based subdirectory for organizing PDFs."""
     hash_suffix = hashlib.md5(pdf_url.encode()).hexdigest()[:8]
-    subdirectory = f"precompute-data/download_vlr_pdfs/{hash_suffix}"
+    subdirectory = os.path.join(BASE_DOWNLOAD_DIR, hash_suffix)
     os.makedirs(subdirectory, exist_ok=True)
     return subdirectory
 
@@ -126,7 +180,9 @@ def use_selenium(url):
     try:
         options = Options()
         options.add_argument("--headless")
-        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
+        options.add_argument("--disable-gpu")
+        options.add_argument("--no-sandbox")
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
         driver.get(url)
         driver.implicitly_wait(10)
         page_source = driver.page_source
@@ -136,17 +192,27 @@ def use_selenium(url):
         logging.error(f"Selenium failed for {url}: {e}")
         return None
 
+def is_pdf_url(url):
+    """Check if the URL points directly to a PDF."""
+    return url.lower().endswith('.pdf')
+
 def download_pdfs_from_url(url, visited_urls, session, unique_hashes):
     """Scrape the page and download PDFs."""
     if url in visited_urls:
         logging.debug(f"Skipping already visited URL: {url}")
         return
 
+    logging.info(f"Processing URL: {url}")
     visited_urls.add(url)
-    logging.info(f"Visiting URL: {url}")
+    add_to_csv(VISITED_URLS_CSV_FILE, [url, datetime.now().strftime('%Y-%m-%d %H:%M:%S')])
+
+    if is_pdf_url(url):
+        # Direct PDF link
+        download_pdf(url, session, unique_hashes)
+        return
 
     try:
-        response = session.get(url, headers=HEADERS, stream=True)
+        response = session.get(url, headers=HEADERS, timeout=30)
         if response.status_code == 403:
             logging.warning(f"403 Forbidden for {url}. Using Selenium.")
             soup = use_selenium(url)
@@ -160,27 +226,29 @@ def download_pdfs_from_url(url, visited_urls, session, unique_hashes):
     if not soup:
         return
 
-    add_to_csv(VISITED_URLS_CSV_FILE, [url, datetime.now().strftime('%Y-%m-%d %H:%M:%S')])
-
+    # Find all PDF links in the page
     for link in soup.find_all('a', href=True):
         href = link['href']
         full_url = urljoin(url, href)
 
-        if re.search(r"\.pdf$", full_url, re.IGNORECASE):
+        if is_pdf_url(full_url):
             download_pdf(full_url, session, unique_hashes)
 
 def main():
     """Main function to orchestrate PDF downloads."""
-    initialize_csv(CSV_FILE_PATH, ['PDF_URL', 'Local_File_Name'])
+    # Initialize CSV files with headers
+    initialize_csv(CSV_FILE_PATH, ['PDF_URL', 'Local_File_Path'])
     initialize_csv(VISITED_URLS_CSV_FILE, ['Visited_URL', 'Timestamp'])
-    initialize_csv(UNIQUE_PDFS_CSV_FILE, ['PDF_URL', 'Local_File_Name', 'Hash'])
-    initialize_csv(DUPLICATE_PDFS_CSV_FILE, ['PDF_URL', 'Local_File_Name', 'Hash'])
+    initialize_csv(UNIQUE_PDFS_CSV_FILE, ['PDF_URL', 'Local_File_Path', 'Hash'])
+    initialize_csv(DUPLICATE_PDFS_CSV_FILE, ['PDF_URL', 'Local_File_Path', 'Hash'])
 
-    visited_urls = load_csv_to_set(VISITED_URLS_CSV_FILE)
+    # Load already visited URLs and unique PDF hashes
+    visited_urls = load_csv_to_set(VISITED_URLS_CSV_FILE, column_index=0)
     unique_hashes = load_csv_to_set(UNIQUE_PDFS_CSV_FILE, column_index=2)
 
     session = create_session_with_ssl_adapter()
 
+    # List of URLs to scrape
     urls_to_scrape = [
         # Insert all the URLs you provided here
         "https://hlpf.un.org/sites/default/files/vnrs/2021/10560NVR%20%28Morocco%29.pdf",
@@ -1020,7 +1088,7 @@ def main():
         "https://hlpf.un.org/sites/default/files/vnrs/2021/10560NVR%20%28Morocco%29.pdf",
         "https://hlpf.un.org/sites/default/files/vnrs/2021/10738egypt.pdf",
         "https://sdgs.un.org/sites/default/files/2021-04/Mexico%20City%20VLR.pdf",
-        # Add the rest of the URLs
+        # ... (Add all other URLs here)
     ]
 
     for url in urls_to_scrape:
