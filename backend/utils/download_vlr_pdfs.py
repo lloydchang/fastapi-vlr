@@ -79,36 +79,32 @@ def download_pdf(pdf_url, session, unique_hashes):
     subdirectory = generate_hash_subdirectory(pdf_url)
     file_path = os.path.join(subdirectory, original_filename)
 
-    # Skip if the file already exists
     if os.path.exists(file_path):
         logging.info(f"PDF already exists: {file_path}")
         return
 
-    # Download the PDF
-    logging.info(f"Downloading PDF: {pdf_url} into {file_path}")
     try:
+        logging.info(f"Downloading PDF: {pdf_url} into {file_path}")
         with session.get(pdf_url, headers=HEADERS, stream=True) as response:
             response.raise_for_status()
             with open(file_path, 'wb') as pdf_file:
                 for chunk in response.iter_content(1024):
                     if chunk:
                         pdf_file.write(chunk)
+            logging.debug(f"Successfully downloaded: {file_path}")
     except Exception as e:
         logging.error(f"Failed to download {pdf_url}. Error: {e}")
         return
 
-    # Generate hash and log uniqueness or duplicates
     pdf_hash = generate_hash(file_path)
     if pdf_hash in unique_hashes:
         logging.info(f"Duplicate PDF detected: {pdf_url}")
         add_to_csv(DUPLICATE_PDFS_CSV_FILE, [pdf_url, file_path, pdf_hash])
     else:
-        # Register the unique PDF
         add_to_csv(UNIQUE_PDFS_CSV_FILE, [pdf_url, file_path, pdf_hash])
         unique_hashes.add(pdf_hash)
         logging.info(f"Registered unique PDF: {pdf_url}")
 
-    # Track all download attempts
     add_to_csv(CSV_FILE_PATH, [pdf_url, file_path])
 
 def generate_hash_subdirectory(pdf_url):
