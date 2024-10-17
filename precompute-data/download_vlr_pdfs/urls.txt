@@ -295,7 +295,6 @@ https://sustainabledevelopment.un.org/content/documents/20470VNR_final_approved_
 https://sustainabledevelopment.un.org/content/documents/23366Voluntary_National_Review_2019_Philippines.pdf
 https://sustainabledevelopment.un.org/content/documents/23402RSA_Voluntary_National_Review_Report___The_Final_24_July_2019.pdf
 https://sustainabledevelopment.un.org/content/documents/23678UK_12072019_UK_Voluntary_National_Review_2019.pdf
-https://sustainabledevelopment.un.org/content/documents/2380320190708_Final_VNR_2019_Indonesia_Rev3.pdf
 https://sustainabledevelopment.un.org/content/documents/24309Informe_Nacional_Voluntario__Uruguay_2019.pdf
 https://sustainabledevelopment.un.org/content/documents/25008REVISIN_NACIONAL_COMPLETA.pdf
 https://sustainabledevelopment.un.org/content/documents/26265VNR_Report_Finland_2020.pdf
@@ -434,7 +433,6 @@ https://unhabitat.org/sites/default/files/2022-07/basque_country_2021_es.pdf
 https://unhabitat.org/sites/default/files/2022-07/cape_town_2021_en.pdf
 https://unhabitat.org/sites/default/files/2022-07/cordoba_2022_en.pdf
 https://unhabitat.org/sites/default/files/2022-07/genova_2022_en.pdf
-https://unhabitat.org/sites/default/files/2022-07/kaohsiung_2021_en.pdf
 https://unhabitat.org/sites/default/files/2022-07/lazio_2022_en.pdf
 https://unhabitat.org/sites/default/files/2022-07/liguria_2022_en.pdf
 https://unhabitat.org/sites/default/files/2022-07/lombardy_milan_2022_en.pdf
@@ -754,7 +752,6 @@ https://www.iges.or.jp/sites/default/files/inline-files/2021%20-%20Vantaa.pdf
 https://www.iges.or.jp/sites/default/files/inline-files/2021%20-%20Yokohama.pdf
 https://www.iges.or.jp/sites/default/files/inline-files/2021%20-%20Yunlin%20County_m.pdf
 https://www.iges.or.jp/sites/default/files/inline-files/2021%20Kaohsiung%20City%20Voluntary%20Local%20Review%20.pdf
-https://www.iges.or.jp/sites/default/files/inline-files/2021%20Taipei%20City%20Voluntary%20Local%20Review.pdf
 https://www.iges.or.jp/sites/default/files/inline-files/2021-Kelowna.pdf
 https://www.iges.or.jp/sites/default/files/inline-files/2022%20-%20Amman.pdf
 https://www.iges.or.jp/sites/default/files/inline-files/2022%20-%20Atenas.pdf
